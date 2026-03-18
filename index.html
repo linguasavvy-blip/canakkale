@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Çanakkale: Siperden Mektuplar</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        :root { --gold: #ffd700; --paper: #f4ecd8; }
+        body { 
+            background: #000; color: white; margin: 0; 
+            font-family: 'Times New Roman', serif; 
+            display: flex; align-items: center; justify-content: center; 
+            height: 100vh; overflow: hidden; 
+        }
+
+        #intro {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.95);
+            z-index: 1000; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; text-align: center;
+        }
+        #start-btn {
+            padding: 15px 40px; background: none; color: var(--gold); 
+            border: 2px solid var(--gold); cursor: pointer; font-size: 20px;
+            transition: 0.3s;
+        }
+        #start-btn:hover { background: var(--gold); color: black; }
+
+        .stage {
+            position: relative; width: 1100px; height: 650px;
+            background: url('bg/bg.png') no-repeat center center;
+            background-size: cover; border: 5px solid #222;
+            box-shadow: 0 0 50px rgba(0,0,0,1);
+        }
+
+        .item { 
+            position: absolute; cursor: pointer; 
+            filter: brightness(0.6) sepia(0.5); 
+            transition: all 0.4s ease;
+            z-index: 5;
+        }
+        .item:hover { filter: brightness(1.2) sepia(0); transform: scale(1.1); }
+        
+        .matara { width: 60px; top: 75%; left: 15%; }
+        .zarf { width: 50px; top: 45%; left: 70%; }
+        .ekmek { width: 55px; top: 82%; left: 45%; }
+
+        #letter-card {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 700px; max-height: 85vh; background: var(--paper); color: #2c1e14;
+            padding: 40px; border-radius: 5px; display: none; z-index: 100;
+            box-shadow: 0 0 100px rgba(0,0,0,0.8);
+            border: 1px solid #d3c4a8; background-image: url('https://www.transparenttextures.com/patterns/old-paper.png');
+            overflow-y: auto;
+        }
+        #letter-card h2 { border-bottom: 2px solid #8b4513; padding-bottom: 10px; }
+        #letter-card p { font-size: 17px; line-height: 1.6; text-align: justify; white-space: pre-line; }
+
+        #hint-box {
+            position: absolute; bottom: 20px; right: 20px; 
+            background: rgba(0,0,0,0.7); border: 1px solid var(--gold);
+            padding: 10px 20px; color: var(--gold); cursor: pointer; z-index: 50;
+        }
+
+        #final {
+            position: absolute; inset: 0; background: #000;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 500; text-align: center;
+        }
+        #final img { width: 450px; margin-bottom: 20px; }
+
+        .ui-info { position: absolute; top: 20px; left: 20px; color: var(--gold); letter-spacing: 2px; }
+    </style>
+</head>
+<body>
+
+<div id="intro">
+    <h1 style="color:var(--gold); font-size: 40px; letter-spacing: 5px;">SİPERDEN MEKTUPLAR</h1>
+    <p style="color:#aaa; max-width: 600px; margin-bottom: 30px;">
+        Vatan uğruna can verenlerin geride bıraktığı gerçek satırlara yolculuk yap.<br>
+        Çanakkale siperlerine gizlenmiş üç emaneti bul ve şehitlerimizin mektuplarını dinle.
+    </p>
+    <button id="start-btn" onclick="startStory()">ARAMAYA BAŞLA</button>
+</div>
+
+<div class="stage" id="game-area">
+    <div class="ui-info">BULUNAN EMANET: <span id="counter">0</span>/3</div>
+
+    <img src="bg/matara.png" class="item matara" id="item0" onclick="openLetter(0, this)">
+    <img src="bg/zarf.png" class="item zarf" id="item1" onclick="openLetter(1, this)">
+    <img src="bg/ekmek.png" class="item ekmek" id="item2" onclick="openLetter(2, this)">
+
+    <div id="hint-box" onclick="showHint()">💡 İpucu İstiyorum</div>
+
+    <div id="letter-card">
+        <h2 id="letter-title">Bir Emanet Bulundu</h2>
+        <p id="letter-text"></p>
+        <button onclick="closeLetter()" style="margin-top:20px; padding:10px 25px; cursor:pointer; background:#8b4513; color:white; border:none; font-family:serif;">Emaneti Yerine Koy</button>
+    </div>
+
+    <div id="final">
+        <img src="bg/bayrak.png" alt="Çanakkale Bayrağı">
+        <h2 style="color:var(--gold); font-size: 32px;">"ÇANAKKALE GEÇİLMEZ!"</h2>
+        <p style="font-size: 18px; max-width: 600px;">Bize bu vatanı bırakan aziz şehitlerimizi minnetle anıyoruz.</p>
+    </div>
+</div>
+
+<audio id="sndWind" loop src="ses/wind.mp3"></audio>
+<audio id="sndFound" src="ses/found.mp3"></audio>
+<audio id="sndLetter"></audio> <script>
+    let found = 0;
+    const data = [
+        { 
+            title: "Kızı Nuriye Hanım'a Mektup", 
+            text: "“Kızım Nuriye Küçük Hanım’a Mahsustur. Benim Sevgili Kızım...\n[Mektup metni buraya gelecek]”,",
+            audio: "ses/nuriye.mp3",
+            hint: "Sol tarafta, siperin dibinde paslı bir matara duruyor."
+        },
+        { 
+            title: "Veda ve Emanet Mektubu", 
+            text: "“Sevgili Kardeşim, Ben vatan ve millet uğrunda bana düşen vazifeyi ifa ettim...\n[Mektup metni buraya gelecek]”",
+            audio: "ses/kardes.mp3",
+            hint: "Karşıdaki siperin üzerine bak! Bir mektup zarfı rüzgarda uçuşuyor."
+        },
+        { 
+            title: "Hanife Hanım’a Vasiyet", 
+            text: "“Aziziye [Pınarbaşı] ilçesinin Kılıç Mehmet Bey köyünden Ahmet Efendi kızı eşim Hanife Hanım’a...\n[Mektup metni buraya gelecek]”",
+            audio: "ses/aziziye.mp3",
+            hint: "Ortalarda, siperin korunaklı yerinde bir ekmek parçası duruyor."
+        }
+    ];
+
+    function startStory() {
+        document.getElementById('intro').style.display = 'none';
+        document.getElementById('sndWind').play();
+        document.getElementById('sndWind').volume = 0.2;
+    }
+
+    function openLetter(id, element) {
+        if(element.style.opacity === "0.1") return;
+
+        found++;
+        document.getElementById('counter').innerText = found;
+        
+        document.getElementById('sndFound').play();
+
+        // Mektuba özel sesi ayarla ve çal
+        const letterAudio = document.getElementById('sndLetter');
+        letterAudio.src = data[id].audio;
+        letterAudio.play();
+
+        document.getElementById('letter-title').innerText = data[id].title;
+        // Metni buraya daha önce verdiğin uzun metinlerle doldurabilirsin
+        document.getElementById('letter-card').style.display = 'block';
+
+        element.style.opacity = "0.1";
+        element.style.pointerEvents = "none";
+    }
+
+    function closeLetter() {
+        document.getElementById('letter-card').style.display = 'none';
+        document.getElementById('sndLetter').pause();
+        document.getElementById('sndLetter').currentTime = 0;
+
+        if(found === 3) {
+            setTimeout(showFinal, 800);
+        }
+    }
+
+    function showHint() {
+        let text = "Tüm emanetleri buldun evlat!";
+        for(let i=0; i<3; i++){
+            let el = document.getElementById('item' + i);
+            if(el.style.opacity !== "0.1") {
+                text = data[i].hint;
+                break;
+            }
+        }
+        alert(text);
+    }
+
+    function showFinal() {
+        document.getElementById('final').style.display = 'flex';
+    }
+</script>
+</body>
+</html>
